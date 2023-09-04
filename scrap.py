@@ -1,7 +1,7 @@
 import requests
 from bs4 import BeautifulSoup
 from requests import Response
-from typing import Optional, Set
+from typing import Optional, Set, Dict, List
 from urllib.parse import urljoin
 
 URL = 'https://www.uoftbookstore.com/general-books/genres?page=1'
@@ -25,6 +25,10 @@ class WebScrapper:
     def get_soup(self) -> Optional[BeautifulSoup]:
         """ Returns a BeautifulSoup object of the website if page retrieved"""
         response = self.response if self.response else self.get_response()
+        if not response:
+            print("error loading webpage")
+            return
+
         if response.status_code == 200:
             self.soup = BeautifulSoup(response.text, 'html.parser')
             return self.soup
@@ -63,6 +67,37 @@ class WebScrapper:
 
         return full_urls
 
+    def find_class(self, class_name: str) -> bool:
+        soup = self.check_soup()
+        if not soup:
+            return False
+
+        if soup.find(class_=class_name):
+            return True
+        return False
+
+
+class Product(WebScrapper):
+
+    def __init__(self, url):
+        super().__init__(url)
+        self.curr_price = None
+        self.old_price = None
+
+    def set_curr_price(self):
+        soup = self.check_soup()
+        if not soup:
+            return False
+
+        self.curr_price = soup.find(class_='product-views-price-lead')
+
+    def set_old_price(self):
+        soup = self.check_soup()
+        if not soup:
+            return False
+
+        self.old_price = soup.find(class_='product-views-price-old')
+
 
 def get_all_products(scrapper: WebScrapper) -> Optional[Set[str]]:
     """ Return a set of products (meant for UofT BookStore Website)
@@ -81,17 +116,27 @@ def get_all_products(scrapper: WebScrapper) -> Optional[Set[str]]:
     return products
 
 
-def check_discount(products: Set[str]) -> Optional[Set[str]]:
+def check_discount(products) -> Optional[Dict]:
     """ For each of the products, check if there is a
-    discount, return a set of all products with discounts"""
+    discount, return a dict of all products with their old and new prices"""
 
-    for product in products:
-        ...
+    discounts = {}
+    for url in products:
+
+        product = Product(url)
+        product.set_curr_price()
+        product.set_old_price()
+        print(product.curr_price, product.old_price)
+
+        if product.old_price:
+            discounts[url] = [product.old_price, product.curr_price]
+
+    return discounts
 
 
-page_title = WebScrapper(URL).get_page_title()
-all_a = WebScrapper(URL).get_links()
-all_p = get_all_products(WebScrapper(URL))
+# all_p = get_all_products(WebScrapper(URL))
+# print(all_p)
+all_p = {'https://www.uoftbookstore.com/Jong-Erica-Fear-Of-Flying'}
+discount = check_discount(all_p)
 
-print(f"Page Title: {page_title}")
-print(f"a: {all_a}")
+print(f'discounts {discount}')
